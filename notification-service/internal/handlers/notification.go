@@ -19,16 +19,13 @@ func SendNotification(c *gin.Context) {
 	}
 
 	from := os.Getenv("EMAIL_FROM")
-	if notif.Type == "" {
-		notif.Type = "email"
-	}
 
 	// Simulate sending delay
 	time.Sleep(1 * time.Second)
 
 	// Log sending (mock sending)
-	fmt.Printf("[Notification] Sent %s to %s from %s\nSubject: %s\nBody: %s\n\n",
-		notif.Type, notif.To, from, notif.Subject, notif.Body)
+	fmt.Printf("[Notification] Sent email to %s from %s\nSubject: %s\nBody: %s\n\n",
+		notif.To, from, notif.Subject, notif.Body)
 
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Notification sent successfully",

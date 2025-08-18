@@ -9,5 +9,5 @@ import (
 func main() {
 	godotenv.Load()
 	r := routes.SetupRouter()
-	r.Run(":8000")
+	r.Run(":8005")
 }

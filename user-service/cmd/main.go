@@ -10,5 +10,5 @@ func main() {
 	db.Connect()
 	db.DB.AutoMigrate(&models.User{})
 	r := routes.SetupRouter()
-	r.Run(":8000")
+	r.Run(":8001")
 }

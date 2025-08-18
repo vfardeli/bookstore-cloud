@@ -5,8 +5,9 @@ services:
       POSTGRES_USER: admin
       POSTGRES_PASSWORD: password
       POSTGRES_DB: users
+      PGPORT: 5433
     ports:
-      - "5433:5432"
+      - "5433:5433"
     volumes:
       - user_data:/var/lib/postgresql/data
 
@@ -16,8 +17,9 @@ services:
       POSTGRES_USER: admin
       POSTGRES_PASSWORD: password
       POSTGRES_DB: books
+      PGPORT: 5434
     ports:
-      - "5434:5432"
+      - "5434:5434"
     volumes:
       - book_data:/var/lib/postgresql/data
 
@@ -27,29 +29,30 @@ services:
       POSTGRES_USER: admin
       POSTGRES_PASSWORD: password
       POSTGRES_DB: orders
+      PGPORT: 5435
     ports:
-      - "5435:5432"
+      - "5435:5435"
     volumes:
       - order_data:/var/lib/postgresql/data
 
   user-service:
     build: ./user-service
     ports:
-      - "8001:8000"
+      - "8001:8001"
     depends_on:
       - user-db
 
   book-service:
     build: ./book-service
     ports:
-      - "8002:8000"
+      - "8002:8002"
     depends_on:
       - book-db
 
   order-service:
     build: ./order-service
     ports:
-      - "8003:8000"
+      - "8003:8003"
     depends_on:
       - order-db
       - book-service
@@ -58,14 +61,23 @@ services:
   payment-service:
     build: ./payment-service
     ports:
-      - "8004:8000"
-    depends_on:
-      - order-service
+      - "8004:8004"
 
   notification-service:
     build: ./notification-service
     ports:
-      - "8005:8000"
+      - "8005:8005"
+  
+  api-gateway:
+    build: ./api-gateway
+    ports:
+      - "8080:8080"
+    depends_on:
+      - user-service
+      - book-service
+      - order-service
+      - payment-service
+      - notification-service
 
 volumes:
   user_data:
