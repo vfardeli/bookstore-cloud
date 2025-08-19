@@ -2,7 +2,10 @@ module api-gateway
 
 go 1.25.0
 
-require github.com/gin-gonic/gin v1.10.1
+require (
+	github.com/gin-gonic/gin v1.10.1
+	github.com/sony/gobreaker v1.0.0
+)
 
 require (
 	github.com/bytedance/sonic v1.11.6 // indirect

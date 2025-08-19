@@ -4,7 +4,8 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"strings"
+
+	"api-gateway/internal/handlers"
 
 	"github.com/gin-gonic/gin"
 )
@@ -39,24 +40,17 @@ func main() {
 	r := gin.Default()
 
 	// Routes → services
-	r.Any("/login", func(c *gin.Context) {
-		forwardRequest(c, "http://user-service:8001/login")
-	})
-	r.Any("/register", func(c *gin.Context) {
-		forwardRequest(c, "http://user-service:8001/register")
-	})
-	r.Any("/books/*path", func(c *gin.Context) {
-		forwardRequest(c, "http://book-service:8002/books"+strings.TrimRight(c.Param("path"), "/"))
-	})
-	r.Any("/orders/*path", func(c *gin.Context) {
-		forwardRequest(c, "http://order-service:8003/orders"+strings.TrimRight(c.Param("path"), "/"))
-	})
-	// r.Any("/payments/*path", func(c *gin.Context) {
-	// 	forwardRequest(c, "http://payment-service:8004/payments"+c.Param("path"))
-	// })
-	// r.Any("/notifications/*path", func(c *gin.Context) {
-	// 	forwardRequest(c, "http://notification-service:8005/notifications"+c.Param("path"))
-	// })
+	// Users
+	r.POST("/register", handlers.ProxyToRegisterUserService)
+	r.POST("/login", handlers.ProxyToLoginService)
+
+	// Books
+	r.Any("/books", handlers.ProxyToBookService)
+	r.Any("/books/*path", handlers.ProxyToBookService)
+
+	// Orders
+	r.Any("/orders", handlers.ProxyToOrderService)
+	r.Any("/orders/*path", handlers.ProxyToOrderService)
 
 	log.Println("API Gateway running on :8080")
 	r.Run(":8080")
