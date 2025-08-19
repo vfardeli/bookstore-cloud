@@ -1,4 +1,13 @@
 services:
+  rabbitmq:
+    image: rabbitmq:4.1.3-management
+    environment:
+      RABBITMQ_DEFAULT_USER: admin
+      RABBITMQ_DEFAULT_PASS: password
+    ports:
+      - "5672:5672"   # broker
+      - "15672:15672" # web dashboard
+
   user-db:
     image: postgres:17.6
     environment:
@@ -57,16 +66,17 @@ services:
       - order-db
       - book-service
       - user-service
+      - rabbitmq
 
   payment-service:
     build: ./payment-service
-    ports:
-      - "8004:8004"
+    depends_on:
+      - rabbitmq
 
   notification-service:
     build: ./notification-service
-    ports:
-      - "8005:8005"
+    depends_on:
+      - rabbitmq
   
   api-gateway:
     build: ./api-gateway

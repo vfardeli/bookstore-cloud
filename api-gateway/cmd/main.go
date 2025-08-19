@@ -4,6 +4,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 )
@@ -45,17 +46,17 @@ func main() {
 		forwardRequest(c, "http://user-service:8001/register")
 	})
 	r.Any("/books/*path", func(c *gin.Context) {
-		forwardRequest(c, "http://book-service:8002/books"+c.Param("path"))
+		forwardRequest(c, "http://book-service:8002/books"+strings.TrimRight(c.Param("path"), "/"))
 	})
 	r.Any("/orders/*path", func(c *gin.Context) {
-		forwardRequest(c, "http://order-service:8003/orders"+c.Param("path"))
+		forwardRequest(c, "http://order-service:8003/orders"+strings.TrimRight(c.Param("path"), "/"))
 	})
-	r.Any("/payments/*path", func(c *gin.Context) {
-		forwardRequest(c, "http://payment-service:8004/payments"+c.Param("path"))
-	})
-	r.Any("/notifications/*path", func(c *gin.Context) {
-		forwardRequest(c, "http://notification-service:8005/notifications"+c.Param("path"))
-	})
+	// r.Any("/payments/*path", func(c *gin.Context) {
+	// 	forwardRequest(c, "http://payment-service:8004/payments"+c.Param("path"))
+	// })
+	// r.Any("/notifications/*path", func(c *gin.Context) {
+	// 	forwardRequest(c, "http://notification-service:8005/notifications"+c.Param("path"))
+	// })
 
 	log.Println("API Gateway running on :8080")
 	r.Run(":8080")
