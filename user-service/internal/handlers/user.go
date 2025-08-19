@@ -2,13 +2,18 @@ package handlers
 
 import (
 	"net/http"
+
 	"user-service/internal/db"
 	"user-service/internal/models"
+	"user-service/internal/utils"
 
 	"github.com/gin-gonic/gin"
 )
 
 func RegisterUser(c *gin.Context) {
+	reqID := c.MustGet("RequestID").(string)
+	utils.SendLog("user-service", reqID, "info", "Registering new user", nil)
+
 	var user models.User
 	if err := c.ShouldBindJSON(&user); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -19,6 +24,9 @@ func RegisterUser(c *gin.Context) {
 }
 
 func LoginUser(c *gin.Context) {
+	reqID := c.MustGet("RequestID").(string)
+	utils.SendLog("user-service", reqID, "info", "Logging in user", nil)
+
 	var req models.User
 	var user models.User
 
