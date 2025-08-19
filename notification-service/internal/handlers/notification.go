@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"notification-service/internal/models"
+	"notification-service/internal/utils"
 
 	amqp "github.com/rabbitmq/amqp091-go"
 )
@@ -57,31 +58,10 @@ func ConsumePayments() {
 	log.Println("Notification Service waiting for payment.completed events...")
 
 	for d := range msgs {
+		reqID := d.CorrelationId
 		var payment models.Payment
 		json.Unmarshal(d.Body, &payment)
 
-		log.Printf("Sending notification: Payment %s for Order %d\n", payment.Status, payment.OrderID)
+		utils.SendLog("notification-service", reqID, "info", fmt.Sprintf("Sending notification: Payment %s for Order %d\n", payment.Status, payment.OrderID), nil)
 	}
 }
-
-// func SendNotification(c *gin.Context) {
-// 	var notif models.Notification
-// 	if err := c.ShouldBindJSON(&notif); err != nil {
-// 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-// 		return
-// 	}
-
-// 	from := os.Getenv("EMAIL_FROM")
-
-// 	// Simulate sending delay
-// 	time.Sleep(1 * time.Second)
-
-// 	// Log sending (mock sending)
-// 	fmt.Printf("[Notification] Sent email to %s from %s\nSubject: %s\nBody: %s\n\n",
-// 		notif.To, from, notif.Subject, notif.Body)
-
-// 	c.JSON(http.StatusOK, gin.H{
-// 		"message": "Notification sent successfully",
-// 		"data":    notif,
-// 	})
-// }

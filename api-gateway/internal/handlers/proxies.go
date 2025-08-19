@@ -3,12 +3,15 @@ package handlers
 import (
 	"bytes"
 	"io"
-	"log"
 	"net/http"
 	"time"
 
+	"api-gateway/internal/utils"
+
 	"github.com/cenkalti/backoff/v4"
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+	"github.com/sirupsen/logrus"
 	"github.com/sony/gobreaker"
 )
 
@@ -16,9 +19,13 @@ var (
 	bookBreaker  *gobreaker.CircuitBreaker
 	orderBreaker *gobreaker.CircuitBreaker
 	userBreaker  *gobreaker.CircuitBreaker
+	log          = logrus.New()
 )
 
 func init() {
+	log.SetFormatter(&logrus.JSONFormatter{})
+	log.SetLevel(logrus.InfoLevel)
+
 	bookBreaker = gobreaker.NewCircuitBreaker(gobreaker.Settings{
 		Name:        "BookService",
 		MaxRequests: 5,
@@ -42,6 +49,8 @@ func init() {
 }
 
 func ProxyToBookService(c *gin.Context) {
+	reqID := uuid.New().String()
+
 	_, err := bookBreaker.Execute(func() (interface{}, error) {
 		client := &http.Client{Timeout: 5 * time.Second}
 
@@ -54,7 +63,11 @@ func ProxyToBookService(c *gin.Context) {
 			targetURL += "?" + c.Request.URL.RawQuery
 		}
 
-		log.Printf("➡️ Forwarding %s %s -> %s", c.Request.Method, c.Request.URL.Path, targetURL)
+		utils.SendLog("api-gateway", reqID, "info", "Forwarding request", map[string]interface{}{
+			"method": c.Request.Method,
+			"path":   c.Request.URL.Path,
+			"target": targetURL,
+		})
 
 		// Copy body (for POST/PUT)
 		var reqBody []byte
@@ -79,17 +92,22 @@ func ProxyToBookService(c *gin.Context) {
 			for k, v := range c.Request.Header {
 				req.Header[k] = v
 			}
+			req.Header.Set("X-Request-ID", reqID)
 
 			resp, err := client.Do(req)
 			if err != nil {
-				log.Printf("❌ Request failed, will retry: %v", err)
+				utils.SendLog("api-gateway", reqID, "warn", "Request failed, retrying", map[string]interface{}{
+					"error": err.Error(),
+				})
 				return err
 			}
 			defer resp.Body.Close()
 
 			// Only retry on 5xx errors
 			if resp.StatusCode >= 500 {
-				log.Printf("⚠️ Book service returned %d, retrying...", resp.StatusCode)
+				utils.SendLog("api-gateway", reqID, "warn", "Book service error, retrying", map[string]interface{}{
+					"status": resp.StatusCode,
+				})
 				return io.EOF
 			}
 
@@ -99,6 +117,7 @@ func ProxyToBookService(c *gin.Context) {
 					c.Writer.Header().Add(k, v)
 				}
 			}
+			c.Writer.Header().Set("X-Request-ID", reqID)
 			c.Writer.WriteHeader(resp.StatusCode)
 			_, copyErr := io.Copy(c.Writer, resp.Body)
 			return copyErr
@@ -113,13 +132,20 @@ func ProxyToBookService(c *gin.Context) {
 	})
 
 	if err != nil {
-		log.Printf("⚡ Circuit breaker triggered or error retries failed: %v", err)
-		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Book Service unavailable, try later"})
+		utils.SendLog("api-gateway", reqID, "error", "Circuit breaker triggered or retries failed", map[string]interface{}{
+			"error": err.Error(),
+		})
+		c.JSON(http.StatusServiceUnavailable, gin.H{
+			"error":      "Book Service unavailable, try later",
+			"request_id": reqID,
+		})
 		return
 	}
 }
 
 func ProxyToOrderService(c *gin.Context) {
+	reqID := uuid.New().String()
+
 	_, err := orderBreaker.Execute(func() (interface{}, error) {
 		client := &http.Client{Timeout: 5 * time.Second}
 
@@ -132,7 +158,11 @@ func ProxyToOrderService(c *gin.Context) {
 			targetURL += "?" + c.Request.URL.RawQuery
 		}
 
-		log.Printf("➡️ Forwarding %s %s -> %s", c.Request.Method, c.Request.URL.Path, targetURL)
+		utils.SendLog("api-gateway", reqID, "info", "Forwarding request", map[string]interface{}{
+			"method": c.Request.Method,
+			"path":   c.Request.URL.Path,
+			"target": targetURL,
+		})
 
 		// Copy body (for POST/PUT)
 		var reqBody []byte
@@ -157,17 +187,22 @@ func ProxyToOrderService(c *gin.Context) {
 			for k, v := range c.Request.Header {
 				req.Header[k] = v
 			}
+			req.Header.Set("X-Request-ID", reqID)
 
 			resp, err := client.Do(req)
 			if err != nil {
-				log.Printf("❌ Request failed, will retry: %v", err)
+				utils.SendLog("api-gateway", reqID, "warn", "Request failed, retrying", map[string]interface{}{
+					"error": err.Error(),
+				})
 				return err
 			}
 			defer resp.Body.Close()
 
 			// Only retry on 5xx errors
 			if resp.StatusCode >= 500 {
-				log.Printf("⚠️ Order service returned %d, retrying...", resp.StatusCode)
+				utils.SendLog("api-gateway", reqID, "warn", "Order service error, retrying", map[string]interface{}{
+					"status": resp.StatusCode,
+				})
 				return io.EOF
 			}
 
@@ -177,6 +212,7 @@ func ProxyToOrderService(c *gin.Context) {
 					c.Writer.Header().Add(k, v)
 				}
 			}
+			c.Writer.Header().Set("X-Request-ID", reqID)
 			c.Writer.WriteHeader(resp.StatusCode)
 			_, copyErr := io.Copy(c.Writer, resp.Body)
 			return copyErr
@@ -191,13 +227,20 @@ func ProxyToOrderService(c *gin.Context) {
 	})
 
 	if err != nil {
-		log.Printf("⚡ Circuit breaker triggered or error retries failed: %v", err)
-		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Order Service unavailable, try later"})
+		utils.SendLog("api-gateway", reqID, "error", "Circuit breaker triggered or retries failed", map[string]interface{}{
+			"error": err.Error(),
+		})
+		c.JSON(http.StatusServiceUnavailable, gin.H{
+			"error":      "Order Service unavailable, try later",
+			"request_id": reqID,
+		})
 		return
 	}
 }
 
 func ProxyToRegisterUserService(c *gin.Context) {
+	reqID := uuid.New().String()
+
 	_, err := userBreaker.Execute(func() (interface{}, error) {
 		client := &http.Client{Timeout: 5 * time.Second}
 
@@ -208,7 +251,11 @@ func ProxyToRegisterUserService(c *gin.Context) {
 			targetURL += "?" + c.Request.URL.RawQuery
 		}
 
-		log.Printf("➡️ Forwarding %s %s -> %s", c.Request.Method, c.Request.URL.Path, targetURL)
+		utils.SendLog("api-gateway", reqID, "info", "Forwarding request", map[string]interface{}{
+			"method": c.Request.Method,
+			"path":   c.Request.URL.Path,
+			"target": targetURL,
+		})
 
 		// Copy body (for POST/PUT)
 		var reqBody []byte
@@ -233,17 +280,22 @@ func ProxyToRegisterUserService(c *gin.Context) {
 			for k, v := range c.Request.Header {
 				req.Header[k] = v
 			}
+			req.Header.Set("X-Request-ID", reqID)
 
 			resp, err := client.Do(req)
 			if err != nil {
-				log.Printf("❌ Request failed, will retry: %v", err)
+				utils.SendLog("api-gateway", reqID, "warn", "Request failed, retrying", map[string]interface{}{
+					"error": err.Error(),
+				})
 				return err
 			}
 			defer resp.Body.Close()
 
 			// Only retry on 5xx errors
 			if resp.StatusCode >= 500 {
-				log.Printf("⚠️ User service returned %d, retrying...", resp.StatusCode)
+				utils.SendLog("api-gateway", reqID, "warn", "User service error, retrying", map[string]interface{}{
+					"status": resp.StatusCode,
+				})
 				return io.EOF
 			}
 
@@ -253,6 +305,7 @@ func ProxyToRegisterUserService(c *gin.Context) {
 					c.Writer.Header().Add(k, v)
 				}
 			}
+			c.Writer.Header().Set("X-Request-ID", reqID)
 			c.Writer.WriteHeader(resp.StatusCode)
 			_, copyErr := io.Copy(c.Writer, resp.Body)
 			return copyErr
@@ -267,13 +320,20 @@ func ProxyToRegisterUserService(c *gin.Context) {
 	})
 
 	if err != nil {
-		log.Printf("⚡ Circuit breaker triggered or error retries failed: %v", err)
-		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "User Service unavailable, try later"})
+		utils.SendLog("api-gateway", reqID, "error", "Circuit breaker triggered or retries failed", map[string]interface{}{
+			"error": err.Error(),
+		})
+		c.JSON(http.StatusServiceUnavailable, gin.H{
+			"error":      "User Service unavailable, try later",
+			"request_id": reqID,
+		})
 		return
 	}
 }
 
 func ProxyToLoginService(c *gin.Context) {
+	reqID := uuid.New().String()
+
 	_, err := userBreaker.Execute(func() (interface{}, error) {
 		client := &http.Client{Timeout: 5 * time.Second}
 
@@ -284,7 +344,11 @@ func ProxyToLoginService(c *gin.Context) {
 			targetURL += "?" + c.Request.URL.RawQuery
 		}
 
-		log.Printf("➡️ Forwarding %s %s -> %s", c.Request.Method, c.Request.URL.Path, targetURL)
+		utils.SendLog("api-gateway", reqID, "info", "Forwarding request", map[string]interface{}{
+			"method": c.Request.Method,
+			"path":   c.Request.URL.Path,
+			"target": targetURL,
+		})
 
 		// Copy body (for POST/PUT)
 		var reqBody []byte
@@ -309,17 +373,22 @@ func ProxyToLoginService(c *gin.Context) {
 			for k, v := range c.Request.Header {
 				req.Header[k] = v
 			}
+			req.Header.Set("X-Request-ID", reqID)
 
 			resp, err := client.Do(req)
 			if err != nil {
-				log.Printf("❌ Request failed, will retry: %v", err)
+				utils.SendLog("api-gateway", reqID, "warn", "Request failed, retrying", map[string]interface{}{
+					"error": err.Error(),
+				})
 				return err
 			}
 			defer resp.Body.Close()
 
 			// Only retry on 5xx errors
 			if resp.StatusCode >= 500 {
-				log.Printf("⚠️ User service returned %d, retrying...", resp.StatusCode)
+				utils.SendLog("api-gateway", reqID, "warn", "User service error, retrying", map[string]interface{}{
+					"status": resp.StatusCode,
+				})
 				return io.EOF
 			}
 
@@ -329,6 +398,7 @@ func ProxyToLoginService(c *gin.Context) {
 					c.Writer.Header().Add(k, v)
 				}
 			}
+			c.Writer.Header().Set("X-Request-ID", reqID)
 			c.Writer.WriteHeader(resp.StatusCode)
 			_, copyErr := io.Copy(c.Writer, resp.Body)
 			return copyErr
@@ -343,8 +413,13 @@ func ProxyToLoginService(c *gin.Context) {
 	})
 
 	if err != nil {
-		log.Printf("⚡ Circuit breaker triggered or error retries failed: %v", err)
-		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "User Service unavailable, try later"})
+		utils.SendLog("api-gateway", reqID, "error", "Circuit breaker triggered or retries failed", map[string]interface{}{
+			"error": err.Error(),
+		})
+		c.JSON(http.StatusServiceUnavailable, gin.H{
+			"error":      "User Service unavailable, try later",
+			"request_id": reqID,
+		})
 		return
 	}
 }

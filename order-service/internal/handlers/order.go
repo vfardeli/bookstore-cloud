@@ -5,17 +5,19 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"order-service/internal/db"
-	"order-service/internal/models"
 	"os"
 	"strconv"
 	"time"
+
+	"order-service/internal/db"
+	"order-service/internal/models"
+	"order-service/internal/utils"
 
 	"github.com/gin-gonic/gin"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
-func publishOrderCreated(order models.Order) {
+func publishOrderCreated(order models.Order, requestID string) {
 	rabbitmqUser := os.Getenv("RABBITMQ_USER")
 	rabbitmqPassword := os.Getenv("RABBITMQ_PASSWORD")
 
@@ -39,8 +41,9 @@ func publishOrderCreated(order models.Order) {
 
 	body, _ := json.Marshal(order)
 	ch.Publish("", q.Name, false, false, amqp.Publishing{
-		ContentType: "application/json",
-		Body:        body,
+		ContentType:   "application/json",
+		Body:          body,
+		CorrelationId: requestID,
 	})
 
 	log.Println("Published order.created event:", string(body))
@@ -91,6 +94,7 @@ func ConsumePayments() {
 	log.Println("Order Service waiting for payment.completed events...")
 
 	for d := range msgs {
+		reqID := d.CorrelationId
 		var payment models.Payment
 		json.Unmarshal(d.Body, &payment)
 
@@ -100,11 +104,14 @@ func ConsumePayments() {
 		order.Status = "PAID"
 		db.DB.Save(order)
 
-		log.Printf("Payment paid for Order %d\n", order.ID)
+		utils.SendLog("order-service", reqID, "info", fmt.Sprintf("Payment paid for Order %d", order.ID), nil)
 	}
 }
 
 func CreateOrder(c *gin.Context) {
+	reqID := c.MustGet("RequestID").(string)
+	utils.SendLog("order-service", reqID, "info", "Creating new order", nil)
+
 	var order models.Order
 	if err := c.ShouldBindJSON(&order); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -141,36 +148,17 @@ func CreateOrder(c *gin.Context) {
 	order.Amount = float64(order.Quantity) * book.Price
 	order.Status = "PENDING"
 	db.DB.Create(&order)
-	log.Println("Order created: ", order)
 
-	// Call Payment Service
-	// paymentPayload := map[string]interface{}{
-	// 	"order_id": order.ID,
-	// 	"method":   "CREDIT_CARD",
-	// 	"amount":   float64(order.Quantity) * book.Price,
-	// }
-	// payloadBytes, _ := json.Marshal(paymentPayload)
+	utils.SendLog("order-service", reqID, "info", fmt.Sprintf("Order created: %v", order), nil)
 
-	// paymentServiceURL := os.Getenv("PAYMENT_SERVICE_URL")
-
-	// paymentResp, err := http.Post(fmt.Sprintf("%s/payments", paymentServiceURL), "application/json", bytes.NewBuffer(payloadBytes))
-	// if err != nil || paymentResp.StatusCode != http.StatusOK {
-	// 	log.Println("Error calling payment service:", err)
-	// 	order.Status = "PAYMENT_FAILED"
-	// 	c.JSON(http.StatusInternalServerError, order)
-	// 	return
-	// }
-	// defer resp.Body.Close()
-
-	// order.Status = "PAID"
-	// db.DB.Save(order)
-	// c.JSON(http.StatusOK, order)
-
-	publishOrderCreated(order)
+	publishOrderCreated(order, reqID)
 	c.JSON(http.StatusCreated, order)
 }
 
 func GetOrders(c *gin.Context) {
+	reqID := c.MustGet("RequestID").(string)
+	utils.SendLog("order-service", reqID, "info", "Fetching order list", nil)
+
 	var orders []models.Order
 	db.DB.Find(&orders)
 	c.JSON(http.StatusOK, orders)

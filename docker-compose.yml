@@ -43,6 +43,9 @@ services:
       - "5435:5435"
     volumes:
       - order_data:/var/lib/postgresql/data
+  
+  log-service:
+    build: ./log-service
 
   user-service:
     build: ./user-service
@@ -50,6 +53,7 @@ services:
       - "8001:8001"
     depends_on:
       - user-db
+      - log-service
 
   book-service:
     build: ./book-service
@@ -57,6 +61,7 @@ services:
       - "8002:8002"
     depends_on:
       - book-db
+      - log-service
 
   order-service:
     build: ./order-service
@@ -64,6 +69,7 @@ services:
       - "8003:8003"
     depends_on:
       - order-db
+      - log-service
       - book-service
       - user-service
       - rabbitmq
@@ -71,11 +77,13 @@ services:
   payment-service:
     build: ./payment-service
     depends_on:
+      - log-service
       - rabbitmq
 
   notification-service:
     build: ./notification-service
     depends_on:
+      - log-service
       - rabbitmq
   
   api-gateway:
@@ -83,6 +91,7 @@ services:
     ports:
       - "8080:8080"
     depends_on:
+      - log-service
       - user-service
       - book-service
       - order-service

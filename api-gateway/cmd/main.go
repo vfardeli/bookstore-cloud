@@ -1,40 +1,11 @@
 package main
 
 import (
-	"io"
-	"log"
-	"net/http"
-
 	"api-gateway/internal/handlers"
+	"log"
 
 	"github.com/gin-gonic/gin"
 )
-
-func forwardRequest(c *gin.Context, target string) {
-	resp, err := http.NewRequest(c.Request.Method, target, c.Request.Body)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	// Copy headers
-	for k, v := range c.Request.Header {
-		for _, val := range v {
-			resp.Header.Add(k, val)
-		}
-	}
-
-	client := &http.Client{}
-	response, err := client.Do(resp)
-	if err != nil {
-		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
-		return
-	}
-	defer response.Body.Close()
-
-	body, _ := io.ReadAll(response.Body)
-	c.Data(response.StatusCode, response.Header.Get("Content-Type"), body)
-}
 
 func main() {
 	r := gin.Default()
