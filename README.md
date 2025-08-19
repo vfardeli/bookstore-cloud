@@ -1,6 +1,6 @@
 # BookStore Cloud
 
-Simple online bookstore platform, broken into independent microservices. Each microservice handles one bounded context and communicates via REST or message queues.
+Simple online bookstore platform, broken into independent microservices. Each microservice handles one bounded context and communicates via REST or message queues (event-driven communication).
 
 
 # High-Level Architecture
@@ -21,6 +21,6 @@ Notification Service – sends order confirmation emails or messages.
 
 API Gateway – single entry point for clients.
 
-Message Broker – asynchronous communication (RabbitMQ or Kafka).
+Message Broker – asynchronous communication (RabbitMQ).
 
 Database per Service – no shared DB, each service owns its data.
