@@ -5,10 +5,15 @@ import (
 	"log"
 
 	"github.com/gin-gonic/gin"
+	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 )
 
 func main() {
+	shutdown := handlers.InitTracer("api-gateway")
+	defer shutdown()
+
 	r := gin.Default()
+	r.Use(otelgin.Middleware("api-gateway"))
 
 	// Routes → services
 	// Users

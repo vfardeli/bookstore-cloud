@@ -14,6 +14,8 @@ func main() {
 	// Run RabbitMQ consumer in a separate goroutine
 	go handlers.ConsumePayments()
 
-	r := routes.SetupRouter()
+	r, shutdown := routes.SetupRouter()
+	defer shutdown()
+
 	r.Run(":8003")
 }

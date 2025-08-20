@@ -13,6 +13,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 	"github.com/sony/gobreaker"
+	"go.opentelemetry.io/otel/propagation"
 )
 
 var (
@@ -93,6 +94,10 @@ func ProxyToBookService(c *gin.Context) {
 				req.Header[k] = v
 			}
 			req.Header.Set("X-Request-ID", reqID)
+
+			// Ensure book-service can continue tracing
+			propagator := propagation.TraceContext{}
+			propagator.Inject(c.Request.Context(), propagation.HeaderCarrier(req.Header))
 
 			resp, err := client.Do(req)
 			if err != nil {

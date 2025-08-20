@@ -9,6 +9,9 @@ import (
 func main() {
 	db.Connect()
 	db.DB.AutoMigrate(&models.Book{})
-	r := routes.SetupRouter()
+
+	r, shutdown := routes.SetupRouter()
+	defer shutdown()
+
 	r.Run(":8002")
 }

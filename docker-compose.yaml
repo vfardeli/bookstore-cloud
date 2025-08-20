@@ -1,4 +1,17 @@
 services:
+  jaeger-all-in-one:
+    image: jaegertracing/all-in-one:1.72.0
+    ports:
+      - "16686:16686" # Jaeger UI
+
+  otel-collector:
+    image: otel/opentelemetry-collector:0.132.0
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otelcol/config.yaml
+    command: ["--config=/etc/otelcol/config.yaml"]
+    depends_on:
+      - jaeger-all-in-one
+
   rabbitmq:
     image: rabbitmq:4.1.3-management
     environment:
@@ -62,6 +75,7 @@ services:
     depends_on:
       - book-db
       - log-service
+      - otel-collector
 
   order-service:
     build: ./order-service
@@ -97,6 +111,7 @@ services:
       - order-service
       - payment-service
       - notification-service
+      - otel-collector
 
 volumes:
   user_data:
