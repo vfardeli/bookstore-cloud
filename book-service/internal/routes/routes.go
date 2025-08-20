@@ -2,6 +2,7 @@ package routes
 
 import (
 	"book-service/internal/handlers"
+	"book-service/internal/metrics"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -13,6 +14,10 @@ func SetupRouter() (*gin.Engine, func()) {
 
 	r := gin.Default()
 
+	// Init Prometheus
+	metrics.InitMetrics()
+
+	r.Use(metrics.PrometheusMiddleware())
 	r.Use(otelgin.Middleware("book-service"))
 	// Middleware: ensure every request has a Request ID
 	r.Use(func(c *gin.Context) {
@@ -28,5 +33,9 @@ func SetupRouter() (*gin.Engine, func()) {
 	r.POST("/books", handlers.AddBook)
 	r.GET("/books", handlers.ListBooks)
 	r.GET("/books/:id", handlers.GetBook)
+
+	// Prometheus metrics endpoint
+	r.GET("/metrics", metrics.MetricsHandler())
+
 	return r, shutdown
 }

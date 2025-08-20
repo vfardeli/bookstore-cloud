@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"book-service/internal/db"
+	"book-service/internal/metrics"
 	"book-service/internal/models"
 	"book-service/internal/utils"
 
@@ -29,6 +30,8 @@ func ListBooks(c *gin.Context) {
 
 	var books []models.Book
 	db.DB.Find(&books)
+
+	metrics.BookRequests.WithLabelValues(c.Request.Method).Inc()
 	c.JSON(http.StatusOK, books)
 }
 
